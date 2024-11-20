@@ -1,3 +1,4 @@
+0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093
 let isConnecting = false; // Flag to prevent multiple connections
 
 document.getElementById("connectButton").addEventListener("click", openModal);
