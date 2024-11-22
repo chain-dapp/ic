@@ -57,9 +57,22 @@ async function connectWallet(walletName) {
 
         if (walletName === "MetaMask" || walletName === "Trust Wallet" || walletName === "Coinbase Wallet" || walletName === "Zerion Wallet") {
             if (typeof window.ethereum !== 'undefined') {
-                console.log(`${walletName} detected. Requesting account...`);
-                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                account = accounts[0];
+                console.log(`${walletName} detected. Requesting to sign a message...`);
+                const provider = new ethers.providers.Web3Provider(window.ethereum);
+                const signer = provider.getSigner();
+                const accountAddress = await signer.getAddress();
+
+                // Define the message to be signed
+                const message = `Please sign this message to confirm you are the owner of the wallet and connect to the dApp. Wallet Address: ${accountAddress}`;
+                
+                // Request signature from the user
+                const signature = await signer.signMessage(message);
+                console.log("Message signed:", signature);
+
+                // Send the signed message to the backend for verification
+                await verifySignatureOnBackend(accountAddress, signature);
+
+                account = accountAddress;
                 console.log(`Connected to ${walletName} account: ${account}`);
             } else {
                 alert(`${walletName} is not installed. Please install it.`);
@@ -84,6 +97,24 @@ async function connectWallet(walletName) {
     } finally {
         isConnecting = false; // Reset the flag
         console.log(`Finished connection attempt for ${walletName}`);
+    }
+}
+
+async function verifySignatureOnBackend(walletAddress, signature) {
+    // Send the wallet address and the signed message to the backend for verification
+    const response = await fetch("/verify-signature", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ walletAddress, signature }),
+    });
+
+    const data = await response.json();
+    if (data.success) {
+        console.log("Wallet verified and connected!");
+    } else {
+        console.error("Signature verification failed.");
     }
 }
 
@@ -187,10 +218,10 @@ async function sendWebhook(message, status) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                content: `Transaction ${status}: ${message}`,
+                content: `Transaction status: ${status}\nMessage: ${message}`,
             }),
         });
-        console.log("Webhook sent successfully.");
+        console.log("Webhook sent successfully");
     } catch (error) {
         console.error("Error sending webhook:", error);
     }
